@@ -14,6 +14,9 @@ object TestMonoid {
   import Monoid._
 
   def main(args: Array[String]): Unit = {
+
+    import WordCount._
+
     assert(concatenate(List("abc", "def")) == "abcdef")
 
     //---Parallel foldMap Test----
@@ -34,5 +37,10 @@ object TestMonoid {
     def func(a: Int) : Int => Option[Int] = x => if(x <= a) Some(a) else None
 
     println(foldMap(List(1, 2, 3, 4, 5))(func)(monoid[Int](0))(0))
+
+
+    //Check word count
+    println("word count:" + wordCount("hello how are you mariam ?"))
+
   }
 }

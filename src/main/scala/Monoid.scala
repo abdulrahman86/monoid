@@ -100,4 +100,44 @@ object Monoid {
     v.lastOption.map(f) getOrElse(m.zero)
 
   }
+
+  object WordCount {
+
+    sealed trait WC
+    case class Stub(chars: String) extends WC
+    case class Par(lStub: String, words: Int, rStub:String) extends WC
+
+    implicit object WCMonoid extends Monoid[WC] {
+
+      override def op(a1: WC, a2: WC): WC = (a1, a2) match {
+        case (Par(lStub1, words1, rStub1), Par(lStub2, words2, rStub2)) => Par(lStub1, words1 + words2 + 1, rStub2)
+        case (e: Stub, f: Par) => f.copy(lStub = e + f.lStub)
+        case (e: Par, f: Stub) => e.copy(rStub = e.rStub + f)
+        case (e: Stub, f: Stub) => e.copy(chars = e.chars + f.chars)
+
+      }
+
+      override def zero: WC = Stub("")
+    }
+
+    def wordCount(s: String): Int = {
+      concatenate(stringToWC(" " +  s + " ")) match {
+        case Par(_, w, _) => w
+        case _ => 0
+      }
+    }
+
+    private def stringToWC(s: String) : List[WC] = {
+
+      if(s.length == 1) s match {
+        case " " => return List(Par("", 0, ""))
+        case a => return List(Stub(a))
+      }
+
+      val (a, b) = s.splitAt(s.length / 2)
+
+      stringToWC(a) ++ stringToWC(b)
+
+    }
+  }
 }
