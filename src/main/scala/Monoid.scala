@@ -69,6 +69,7 @@ object Monoid {
     }
 
 
+
   def parFoldMap[A, B](v: IndexedSeq[A])(f: A => B)(implicit m: Monoid[Par[B]]): Par[B] = {
     if (v.length == 0) {
       m.zero
@@ -83,7 +84,7 @@ object Monoid {
   }
 
   def concatenate[A: Monoid](in: List[A])(implicit monoid: Monoid[A]): A =
-    in.foldRight(monoid.zero)((a1, a2) => monoid.op(a1, a2))
+    in.foldLeft(monoid.zero)((a1, a2) => monoid.op(a1, a2))
 
   def foldMap[A, B](as: List[A])(f: A => B)(implicit monoid: Monoid[B]): B = concatenate(as.map(f))
 
