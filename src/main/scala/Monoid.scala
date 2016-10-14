@@ -1,3 +1,4 @@
+import Par._
 
 trait Monoid[A]{
 
@@ -20,10 +21,10 @@ object Monoid {
     override def zero: List[_] = List()
   }
 
-  val intAdditionMonoid = new Monoid[Integer] {
-    override def op(a1: Integer, a2: Integer): Integer = a1 + a2
+  implicit val intAdditionMonoid = new Monoid[Int] {
+    override def op(a1: Int, a2: Int): Int = a1 + a2
 
-    override def zero: Integer = 0
+    override def zero: Int = 0
   }
 
   val intMultiplicationMonoid = new Monoid[Integer] {
@@ -50,11 +51,35 @@ object Monoid {
     override def zero: Option[_] = None
   }
 
-  def endoMonoid[A]: Monoid[A => A] = new Monoid[(A) => A] {
+  implicit def endoMonoid[A]: Monoid[A => A] = new Monoid[(A) => A] {
 
     override def op(a1: (A) => A, a2: (A) => A): (A) => A = a1.andThen(a2)
 
     override def zero: (A) => A = x => x
+  }
+
+  implicit def parMonoid[A](implicit monoid: Monoid[A]): Monoid[Par[A]] =
+    new Monoid[Par[A]] {
+
+      override def op(a1: Par[A], a2: Par[A]): Par[A] = {
+        map2(monoid.op)(a1)(a2)
+      }
+
+      override def zero: Par[A] = unit(monoid.zero)
+    }
+
+
+  def parFoldMap[A, B](v: IndexedSeq[A])(f: A => B)(implicit m: Monoid[Par[B]]): Par[B] = {
+    if (v.length == 0) {
+      m.zero
+    }
+    else if (v.length == 1) {
+      m.op(m.zero, unit(f(v.last)))
+    }
+    else {
+      val (a, b) = v.splitAt(v.length / 2)
+      m.op(fork(parFoldMap(a)(f)), fork(parFoldMap(b)(f)))
+    }
   }
 
   def concatenate[A: Monoid](in: List[A])(implicit monoid: Monoid[A]): A =
