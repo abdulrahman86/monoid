@@ -59,6 +59,17 @@ object Monoid {
     override def zero: (A, B) = (implicitly[Monoid[A]].zero, implicitly[Monoid[B]].zero)
   }
 
+  implicit def functionMonoid[A, B: Monoid] = new Monoid[A => B] {
+
+    override def op: ((A) => B, (A) => B) => A => B = (a, b) => {
+      in => {
+        implicitly[Monoid[B]].op(a(in), b(in))
+      }
+    }
+
+    override def zero: (A) => B = in => implicitly[Monoid[B]].zero
+  }
+
   implicit def endoMonoid[A]: Monoid[A => A] = new Monoid[(A) => A] {
 
     override def op= (a1, a2) => a1.andThen(a2)
