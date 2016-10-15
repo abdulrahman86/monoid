@@ -2,7 +2,7 @@ import Par._
 
 trait Monoid[A]{
 
-  def op(a1: A, a2: A): A
+  def op: (A, A) => A
   def zero: A
 }
 
@@ -10,50 +10,58 @@ object Monoid {
 
   implicit object StringMonoid extends Monoid[String] {
 
-    override def op(a1: String, a2: String): String = a1.concat(a2)
+    override def op = (a1, a2) => a1.concat(a2)
 
     override def zero: String = ""
   }
 
   implicit object ListMonoid extends Monoid[List[_]] {
-    override def op(a1: List[_], a2: List[_]): List[_] = a1 ::: a2
+    override def op = (a1, a2) => a1 ::: a2
 
     override def zero: List[_] = List()
   }
 
   implicit val intAdditionMonoid = new Monoid[Int] {
-    override def op(a1: Int, a2: Int): Int = a1 + a2
+    override def op = (a1 ,a2) => a1 + a2
 
     override def zero: Int = 0
   }
 
   val intMultiplicationMonoid = new Monoid[Integer] {
-    override def op(a1: Integer, a2: Integer): Integer = a1 * a2
+    override def op = (a1, a2) => a1 * a2
 
     override def zero: Integer = 0
   }
 
   val booleanOrMonoid = new Monoid[Boolean] {
-    override def op(a1: Boolean, a2: Boolean): Boolean = a1 || a2
+    override def op = (a1, a2) => a1 || a2
 
     override def zero: Boolean = false
   }
 
   val booleanAndMonoid = new Monoid[Boolean] {
-    override def op(a1: Boolean, a2: Boolean): Boolean = a1 && a2
+    override def op = (a1, a2) => a1 && a2
 
     override def zero: Boolean = true
   }
 
   implicit object OptionMonoid extends Monoid[Option[_]] {
-    override def op(a1: Option[_], a2: Option[_]): Option[_] = a1 orElse a2
+    override def op = (a1, a2) => a1 orElse a2
 
     override def zero: Option[_] = None
   }
 
+  implicit def productMonoid[A: Monoid, B: Monoid] = new Monoid[(A, B)] {
+
+    override def op: ((A, B), (A, B)) => (A, B) =
+      (a, b) => (implicitly[Monoid[A]].op(a._1, b._1), implicitly[Monoid[B]].op(a._2, b._2))
+
+    override def zero: (A, B) = (implicitly[Monoid[A]].zero, implicitly[Monoid[B]].zero)
+  }
+
   implicit def endoMonoid[A]: Monoid[A => A] = new Monoid[(A) => A] {
 
-    override def op(a1: (A) => A, a2: (A) => A): (A) => A = a1.andThen(a2)
+    override def op= (a1, a2) => a1.andThen(a2)
 
     override def zero: (A) => A = x => x
   }
@@ -61,7 +69,7 @@ object Monoid {
   implicit def parMonoid[A](implicit monoid: Monoid[A]): Monoid[Par[A]] =
     new Monoid[Par[A]] {
 
-      override def op(a1: Par[A], a2: Par[A]): Par[A] = {
+      override def op = (a1, a2) => {
         map2(monoid.op)(a1)(a2)
       }
 
@@ -109,7 +117,7 @@ object Monoid {
 
     implicit object WCMonoid extends Monoid[WC] {
 
-      override def op(a1: WC, a2: WC): WC = (a1, a2) match {
+      override def op = {
         case (Par(lStub1, words1, rStub1), Par(lStub2, words2, rStub2)) => Par(lStub1, words1 + words2 + 1, rStub2)
         case (e: Stub, f: Par) => f.copy(lStub = e + f.lStub)
         case (e: Par, f: Stub) => e.copy(rStub = e.rStub + f)
@@ -138,6 +146,47 @@ object Monoid {
 
       stringToWC(a) ++ stringToWC(b)
 
+    }
+  }
+
+  trait Foldable[F[_]] {
+    def foldRight[A, B](as: F[A])(z: B)(f: (A, B) => B) : B
+
+    def foldLeft[A, B](as: F[A])(z: B)(f: (B, A) => B) : B
+
+    def foldMap[A, B](as: F[A])(f: A => B)(m: Monoid[B]) : B
+
+    def concatenate[A](as: F[A])(m: Monoid[A]) : A =
+      foldLeft(as)(m.zero)(m.op)
+
+    def toList[A](as: F[A]): List[A] = foldLeft[A, List[A]](as)(List())((b, a) => b ::: List(a))
+  }
+
+  object Foldable {
+
+    implicit object FoldableList extends Foldable[List] {
+
+      override def foldRight[A, B](as: List[A])(z: B)(f: (A, B) => B): B =
+        as.foldRight(z)(f)
+
+      override def foldLeft[A, B](as: List[A])(z: B)(f: (B, A) => B): B =
+        as.foldLeft(z)(f)
+
+      override def foldMap[A, B](as: List[A])(f: (A) => B)(m: Monoid[B]): B =
+        as.map(f).foldLeft(m.zero)(m.op)
+
+    }
+
+    implicit object FoldableOption extends Foldable[Option] {
+
+      override def foldRight[A, B](as: Option[A])(z: B)(f: (A, B) => B): B =
+        as.map(x => f(x, z)) getOrElse z
+
+      override def foldLeft[A, B](as: Option[A])(z: B)(f: (B, A) => B): B =
+        as.map(x => f(z, x)) getOrElse z
+
+      override def foldMap[A, B](as: Option[A])(f: (A) => B)(m: Monoid[B]): B =
+        as.map(f.andThen(m.op.curried(m.zero))) getOrElse m.zero
     }
   }
 }

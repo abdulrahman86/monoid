@@ -28,8 +28,8 @@ object TestMonoid {
     //---Check order of indexed sequence
     implicit def monoid[A](base: A) = new Monoid[A => Option[A]] {
 
-      override def op(a1: (A) => Option[A], a2: (A) => Option[A]): (A) => Option[A] =
-        in => a1(in).flatMap(a2)
+      override def op =
+        (a1, a2) => in => a1(in).flatMap(a2)
 
       override def zero: (A) => Option[A] = _ => Some(base)
     }
